@@ -177,21 +177,59 @@ jobs:
   - name: metron_agent
     release: cf
   update: {}
-- instances: 1
+- instances: 0
   name: nfs_z1
   networks:
   - name: cf1
-    static_ips:
-    - 10.10.0.128
+    static_ips: []
   persistent_disk: 102400
   properties:
     metron_agent:
       zone: z1
+    route_registrar:
+      routes:
+      - name: blobstore
+        port: 80
+        tags:
+          component: blobstore
+        uris:
+        - blobstore.DOMAIN
   resource_pool: medium_z1
   templates:
   - name: debian_nfs_server
     release: cf
   - name: metron_agent
+    release: cf
+  - name: blobstore
+    release: cf
+  - name: route_registrar
+    release: cf
+  update: {}
+- instances: 1
+  name: blobstore_z1
+  networks:
+  - name: cf1
+    static_ips:
+    - 10.10.0.131
+  persistent_disk: 102400
+  properties:
+    metron_agent:
+      zone: z1
+    route_registrar:
+      routes:
+      - name: blobstore
+        port: 80
+        tags:
+          component: blobstore
+        uris:
+        - blobstore.DOMAIN
+  resource_pool: medium_z1
+  templates:
+  - name: metron_agent
+    release: cf
+  - name: blobstore
+    release: cf
+  - name: route_registrar
     release: cf
   update: {}
 - instances: 1
@@ -302,7 +340,7 @@ jobs:
     metron_agent:
       zone: z1
     nfs_server:
-      address: 10.10.0.128
+      address: null
       allow_from_entries:
       - 10.10.0.0/24
       - null
@@ -345,7 +383,7 @@ jobs:
     metron_agent:
       zone: z2
     nfs_server:
-      address: 10.10.0.128
+      address: null
       allow_from_entries:
       - 10.10.0.0/24
       - null
@@ -397,7 +435,7 @@ jobs:
     metron_agent:
       zone: z1
     nfs_server:
-      address: 10.10.0.128
+      address: null
       allow_from_entries:
       - 10.10.0.0/24
       - null
@@ -422,7 +460,7 @@ jobs:
     metron_agent:
       zone: z2
     nfs_server:
-      address: 10.10.0.128
+      address: null
       allow_from_entries:
       - 10.10.0.0/24
       - null
@@ -516,7 +554,7 @@ jobs:
               name: dns_health_check
               script: /var/vcap/jobs/dea_next/bin/dns_health_check
               interval: 5m
-              status: passing      
+              status: passing
   resource_pool: runner_z1
   templates:
   - name: dea_next
@@ -789,6 +827,13 @@ properties:
   app_domains:
   - APP_DOMAIN
   app_ssh: null
+  blobstore:
+    admin_users:
+    - password: blobstore-password
+      username: blobstore-username
+    port: 80
+    secure_link:
+      secret: blobstore-secret
   cc:
     allow_app_ssh_access: true
     allowed_cors_domains: []
@@ -802,9 +847,15 @@ properties:
     broker_client_max_async_poll_duration_minutes: null
     broker_client_timeout_seconds: 70
     buildpacks:
+      blobstore_type: webdav
       buildpack_directory_key: DOMAIN-cc-buildpacks
       cdn: null
       fog_connection: null
+      webdav_config:
+        endpoint: http://blobstore.DOMAIN
+        password: blobstore-password
+        secret: blobstore-secret
+        username: blobstore-username
     bulk_api_password: BULK_API_PASSWORD
     client_max_body_size: 15M
     db_encryption_key: DB_ENCRYPTION_KEY
@@ -841,10 +892,16 @@ properties:
     directories: null
     disable_custom_buildpacks: false
     droplets:
+      blobstore_type: webdav
       cdn: null
       droplet_directory_key: DOMAIN-cc-droplets
       fog_connection: null
       max_staged_droplets_stored: null
+      webdav_config:
+        endpoint: http://blobstore.DOMAIN
+        password: blobstore-password
+        secret: blobstore-secret
+        username: blobstore-username
     external_host: api
     external_port: 9022
     external_protocol: null
@@ -904,10 +961,16 @@ properties:
         record_sql: obfuscated
     packages:
       app_package_directory_key: DOMAIN-cc-packages
+      blobstore_type: webdav
       cdn: null
       fog_connection: null
       max_package_size: 1073741824
       max_valid_packages_stored: null
+      webdav_config:
+        endpoint: http://blobstore.DOMAIN
+        password: blobstore-password
+        secret: blobstore-secret
+        username: blobstore-username
     quota_definitions:
       default:
         memory_limit: 10240
@@ -915,9 +978,15 @@ properties:
         total_routes: 1000
         total_services: 100
     resource_pool:
+      blobstore_type: webdav
       cdn: null
       fog_connection: null
       resource_directory_key: DOMAIN-cc-resources
+      webdav_config:
+        endpoint: http://blobstore.DOMAIN
+        password: blobstore-password
+        secret: blobstore-secret
+        username: blobstore-username
     security_group_definitions:
     - name: public_networks
       rules:
@@ -973,6 +1042,11 @@ properties:
         restart_if_consistently_above_mb: null
     user_buildpacks: []
     users_can_select_backend: true
+    webdav_config:
+      endpoint: http://blobstore.DOMAIN
+      password: blobstore-password
+      secret: blobstore-secret
+      username: blobstore-username
   ccdb:
     address: 10.10.0.129
     databases:
@@ -1047,18 +1121,18 @@ properties:
   disk_quota_enabled: true
   domain: DOMAIN
   doppler:
-    zone: null
     blacklisted_syslog_ranges: null
     debug: false
     enable_tls_transport: null
     maxRetainedLogMessages: 100
+    message_drain_buffer_size: null
     port: 4443
     tls_server:
       cert: null
       key: null
       port: null
     unmarshaller_count: 5
-    message_drain_buffer_size: null
+    zone: null
   doppler_endpoint:
     shared_secret: LOGGREGATOR_ENDPOINT_SHARED_SECRET
   dropsonde:
@@ -1123,9 +1197,9 @@ properties:
     uaa_base: null
     url: null
   metron_agent:
-    enable_buffer: null
     buffer_size: null
     deployment: ENVIRONMENT
+    enable_buffer: null
     preferred_protocol: null
     tls_client:
       cert: null
@@ -1143,7 +1217,7 @@ properties:
     trace: false
     user: NATS_USER
   nfs_server:
-    address: 10.10.0.128
+    address: null
     allow_from_entries:
     - 10.10.0.0/24
     - null
@@ -1152,19 +1226,19 @@ properties:
   router:
     cipher_suites: null
     debug_addr: null
+    enable_routing_api: null
     enable_ssl: null
     extra_headers_to_log: null
     logrotate: null
     port: null
     requested_route_registration_interval_in_seconds: null
-    route_services_timeout: null
     route_services_secret: null
     route_services_secret_decrypt_only: null
+    route_services_timeout: null
     secure_cookies: null
     ssl_cert: null
     ssl_key: null
     ssl_skip_validation: null
-    enable_routing_api: null
     status:
       password: ROUTER_PASSWORD
       port: null
@@ -1177,8 +1251,8 @@ properties:
   system_domain: SYSTEM_DOMAIN
   system_domain_organization: SYSTEM_DOMAIN_ORGANIZATION
   traffic_controller:
-    zone: null
     outgoing_port: 8080
+    zone: null
   uaa:
     admin:
       client_secret: ADMIN_SECRET
@@ -1196,13 +1270,14 @@ properties:
         authorized-grant-types: client_credentials
         secret: CC_ROUTING_SECRET
       cf:
-        autoapprove: true
-        override: true
-        authorized-grant-types: implicit,password,refresh_token
-        scope: cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read
-        authorities: uaa.none
         access-token-validity: 600
+        authorities: uaa.none
+        authorized-grant-types: implicit,password,refresh_token
+        autoapprove: true
+        id: cf
+        override: true
         refresh-token-validity: 2592000
+        scope: cloud_controller.read,cloud_controller.write,openid,password.write,cloud_controller.admin,scim.read,scim.write,doppler.firehose,uaa.user,routing.router_groups.read
       cloud_controller_username_lookup:
         authorities: scim.userids
         authorized-grant-types: client_credentials
@@ -1215,6 +1290,18 @@ properties:
         authorities: routing.routes.read
         authorized-grant-types: client_credentials,refresh_token
         secret: GOROUTER_SECRET
+      login:
+        authorities: oauth.login,scim.write,clients.read,notifications.write,critical_notifications.write,emails.write,scim.userids,password.write
+        authorized-grant-types: authorization_code,client_credentials,refresh_token
+        autoapprove: true
+        override: true
+        redirect-uri: https://login.DOMAIN
+        scope: openid,oauth.approvals
+        secret: LOGIN_CLIENT_SECRET
+      notifications:
+        authorities: cloud_controller.admin,scim.read
+        authorized-grant-types: client_credentials
+        secret: NOTIFICATIONS_CLIENT_SECRET
       tcp_emitter:
         authorities: routing.routes.write,routing.routes.read
         authorized-grant-types: client_credentials,refresh_token
@@ -1223,18 +1310,6 @@ properties:
         authorities: routing.routes.read
         authorized-grant-types: client_credentials,refresh_token
         secret: TCP-ROUTER-SECRET
-      login:
-        authorities: oauth.login,scim.write,clients.read,notifications.write,critical_notifications.write,emails.write,scim.userids,password.write
-        authorized-grant-types: authorization_code,client_credentials,refresh_token
-        override: true
-        redirect-uri: https://login.DOMAIN
-        scope: openid,oauth.approvals
-        secret: LOGIN_CLIENT_SECRET
-        autoapprove: true
-      notifications:
-        authorities: cloud_controller.admin,scim.read
-        authorized-grant-types: client_credentials
-        secret: NOTIFICATIONS_CLIENT_SECRET
     database: null
     issuer: https://uaa.DOMAIN
     jwt:
